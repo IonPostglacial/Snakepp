@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Snake Game</title>
+    <style>
+        #canvas { border: 1px solid white; display: block; margin-left: auto; margin-right: auto; }
+        #score { font-family: 'Courier New', Courier, monospace; font-size: large; color: white; text-align: center; }
+        #buttons { text-align: center; transform: rotate(45deg); }
+        #up { border-right: none; border-bottom: none; }
+        #right { border-left: none; border-bottom: none; }
+        #left { border-right: none; border-top: none; }
+        #down { border-left: none; border-top: none; }
+        body { background-color: black; box-sizing: border-box; overflow-y: hidden; }
+        button { margin: 5px; background-color: black; color: white; border: 3px solid white; width: 50px; height: 50px; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <p id="score">
+        Score: <span id="score-display">0</span>
+    </p>
+    <div id="buttons">
+        <button id="up"></button><button id="right"></button><br><button id="left"></button><button id="down"></button>
+    </div>
+    <script type="module">
+        const eventNames = ["added", "modified", "removed"];
+        const canvas = document.getElementById("canvas");
+        const scoreDisplay = document.getElementById("score-display");
+        const up = document.getElementById("up");
+        const left = document.getElementById("left");
+        const down = document.getElementById("down");
+        const right = document.getElementById("right");
+        const cx = canvas.getContext("2d");
+        let stepPeriod = 300;
+        const importObject = {
+            env: {
+                canvas_set_fill_style(hexColor) {
+                    var color = "#" + hexColor.toString(16).padStart(6, "0");
+                    cx.fillStyle = color;
+                },
+                canvas_fill_rect(x, y, width, height) {
+                    cx.fillRect(x, y, width, height);
+                },
+                canvas_fill() {
+                    cx.fill();
+                },
+                snake_score_changed(score) {
+                    scoreDisplay.textContent = score;
+                },
+                snake_step_period_updated(period) {
+                    stepPeriod = period;
+                },
+                snake_game_over() {
+                    window.alert("Game Over !");
+                    window.location.reload();
+                },
+                js_random(max) {
+                    return Math.random() * max;
+                },
+            }
+        };
+        const obj = await WebAssembly.instantiateStreaming(fetch("./snake.wasm"), importObject);
+        const keys = { ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3 };
+        obj.instance.exports.init();
+        window.onkeydown = e => {
+            e.stopPropagation();
+            obj.instance.exports.on_key_down(keys[e.code])
+        };
+        up.onclick = () => obj.instance.exports.on_key_down(keys.ArrowUp);
+        down.onclick = () => obj.instance.exports.on_key_down(keys.ArrowDown);
+        left.onclick = () => obj.instance.exports.on_key_down(keys.ArrowLeft);
+        right.onclick = () => obj.instance.exports.on_key_down(keys.ArrowRight);
+        let lastUpdateTimestamp = -1;
+        function step(timestamp) {
+            if (lastUpdateTimestamp < 0) lastUpdateTimestamp = timestamp;
+            const progress = timestamp - lastUpdateTimestamp;
+            if (progress >= stepPeriod) {
+                lastUpdateTimestamp = timestamp;
+                obj.instance.exports.step(progress);
+            }
+            window.requestAnimationFrame(step);
+        }
+        window.requestAnimationFrame(step);
+    </script>
+</body>
+</html>
