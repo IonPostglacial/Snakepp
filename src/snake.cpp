@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <emscripten.h>
 
 extern "C" void canvas_set_fill_style(uint32_t color);
 extern "C" void canvas_fill_rect(int32_t x, int32_t y, int32_t width, int32_t height);
@@ -33,10 +34,10 @@ enum class KeyCode
 
 bool direction_is_opposite(Direction dir, Direction other)
 {
-    return dir == Direction::UP && other == Direction::DOWN ||
-           dir == Direction::DOWN && other == Direction::UP ||
-           dir == Direction::LEFT && other == Direction::RIGHT ||
-           dir == Direction::RIGHT && other == Direction::LEFT;
+    return ((dir == Direction::UP) && (other == Direction::DOWN)) ||
+           ((dir == Direction::DOWN) && (other == Direction::UP)) ||
+           ((dir == Direction::LEFT) && (other == Direction::RIGHT)) ||
+           ((dir == Direction::RIGHT) && (other == Direction::LEFT));
 }
 
 struct Position
@@ -170,7 +171,7 @@ void change_snake_direction(Direction d)
     snake.direction = d;
 }
 
-extern "C" void on_key_down(enum KeyCode code)
+extern "C" EMSCRIPTEN_KEEPALIVE void on_key_down(enum KeyCode code)
 {
     switch (code) {
     case KeyCode::ARROW_UP:
@@ -221,7 +222,7 @@ void repaint()
     canvas_fill();
 }
 
-extern "C" void step(int32_t timestamp)
+extern "C" EMSCRIPTEN_KEEPALIVE void step(int32_t timestamp)
 {
     if (snake_will_eat_apple()) {
         snake.grow();
@@ -238,7 +239,7 @@ extern "C" void step(int32_t timestamp)
     repaint();
 }
 
-extern "C" void init()
+extern "C" EMSCRIPTEN_KEEPALIVE void init()
 {
     stepPeriod = 300;
     next_reward = 10;
