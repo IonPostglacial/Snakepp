@@ -1,5 +1,10 @@
 #include <stdint.h>
+
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
 
 extern "C" void canvas_set_fill_style(uint32_t color);
 extern "C" void canvas_fill_rect(int32_t x, int32_t y, int32_t width, int32_t height);
@@ -157,99 +162,103 @@ void paint_apple(Position apple)
     canvas_fill_rect(apple.x * CELL_SIZE, apple.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 }
 
-static Snake snake;
-static Position apple;
-static int32_t stepPeriod;
-static int32_t score;
-static int32_t next_reward;
+struct GameState {
+    Snake snake;
+    Position apple;
+    int32_t stepPeriod;
+    int32_t score;
+    int32_t next_reward;
+};
 
-void change_snake_direction(Direction d) 
+static GameState GAME;
+
+void change_snake_direction(GameState *game, Direction d) 
 {
-    if (direction_is_opposite(snake.direction, d)) {
+    if (direction_is_opposite(game->snake.direction, d)) {
         return;
     }
-    snake.direction = d;
+    game->snake.direction = d;
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void on_key_down(enum KeyCode code)
 {
     switch (code) {
     case KeyCode::ARROW_UP:
-        change_snake_direction(Direction::UP);
+        change_snake_direction(&GAME, Direction::UP);
         break;
     case KeyCode::ARROW_DOWN:
-        change_snake_direction(Direction::DOWN);
+        change_snake_direction(&GAME, Direction::DOWN);
         break;
     case KeyCode::ARROW_LEFT:
-        change_snake_direction(Direction::LEFT);
+        change_snake_direction(&GAME, Direction::LEFT);
         break;
     case KeyCode::ARROW_RIGHT:
-        change_snake_direction(Direction::RIGHT);
+        change_snake_direction(&GAME, Direction::RIGHT);
         break;
     }
 }
 
-void speedup_game()
+void speedup_game(GameState *game)
 {
-    if (stepPeriod > 50) {
-        stepPeriod -= 25;
-        snake_step_period_updated(stepPeriod);
+    if (game->stepPeriod > 50) {
+        game->stepPeriod -= 25;
+        snake_step_period_updated(game->stepPeriod);
     }
 }
 
-bool snake_will_eat_apple() 
+bool snake_will_eat_apple(GameState *game) 
 { 
-    return snake.next_head_position() == apple;
+    return game->snake.next_head_position() == game->apple;
 }
 
-void update_score()
+void update_score(GameState *game)
 {
-    score += next_reward;
-    next_reward += 10;
+    game->score += game->next_reward;
+    game->next_reward += 10;
 }
 
-void teleport_apple()
+void teleport_apple(GameState *game)
 {
-    apple.x = js_random(GRID_WIDTH);
-    apple.y = js_random(GRID_HEIGHT);
+    game->apple.x = js_random(GRID_WIDTH);
+    game->apple.y = js_random(GRID_HEIGHT);
 }
 
-void repaint()
+void repaint(GameState *game)
 {
     paint_background();
-    paint_snake(snake);
-    paint_apple(apple);
+    paint_snake(game->snake);
+    paint_apple(game->apple);
     canvas_fill();
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void step(int32_t timestamp)
 {
-    if (snake_will_eat_apple()) {
-        snake.grow();
-        teleport_apple();
-        speedup_game();
-        update_score();
-        snake_score_changed(score);
+    if (snake_will_eat_apple(&GAME)) {
+        GAME.snake.grow();
+        teleport_apple(&GAME);
+        speedup_game(&GAME);
+        update_score(&GAME);
+        snake_score_changed(GAME.score);
     } else {
-        snake.move_ahead();
+        GAME.snake.move_ahead();
     }
-    if (snake.is_out_of_bounds(GRID_WIDTH, GRID_HEIGHT) || snake.eats_himself()) {
+    if (GAME.snake.is_out_of_bounds(GRID_WIDTH, GRID_HEIGHT) || GAME.snake.eats_himself()) {
         snake_game_over();
     }
-    repaint();
+    repaint(&GAME);
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void init()
 {
-    stepPeriod = 300;
-    next_reward = 10;
-    teleport_apple();
-    snake.length = 4;
-    snake.head_index = 3;
-    snake.direction = Direction::RIGHT;
-    snake.segments[1].x = 1;
-    snake.segments[2].x = 2;
-    snake.segments[3].x = 3;
-    repaint();
+    GAME.stepPeriod = 300;
+    GAME.next_reward = 10;
+    teleport_apple(&GAME);
+    GAME.snake.length = 4;
+    GAME.snake.head_index = 3;
+    GAME.snake.direction = Direction::RIGHT;
+    GAME.snake.segments[1].x = 1;
+    GAME.snake.segments[2].x = 2;
+    GAME.snake.segments[3].x = 3;
+    repaint(&GAME);
     snake_score_changed(0);
 }

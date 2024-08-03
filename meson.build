@@ -5,7 +5,7 @@ configure_file(input : 'src/index.html', output : 'index.html', copy : true)
 
 executable('snake', 'src/snake.cpp',
     cpp_args : [],
-    name_suffix : 'wasm',
+    name_suffix : 'js',
     link_args : [
         '-Wl,--allow-undefined',
     ])
